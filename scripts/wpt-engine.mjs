@@ -6,7 +6,8 @@
 
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -71,15 +72,20 @@ export async function prepare(dist = DEFAULT_DIST, config = resolve(ENGINE_DIR, 
     dirname(wranglerPackage),
     JSON.parse(readFileSync(wranglerPackage, "utf8")).bin.wrangler,
   );
-  execFileSync(
-    process.execPath,
-    [wrangler, "deploy", "--dry-run", "--config", config, "--outdir", dist],
-    {
-      cwd: dirname(config),
-      stdio: ["ignore", "inherit", "inherit"],
-      env: { ...process.env, WRANGLER_SEND_METRICS: "false" },
-    },
-  );
+  const configHome = mkdtempSync(resolve(tmpdir(), "kitesurf-wrangler-"));
+  try {
+    execFileSync(
+      process.execPath,
+      [wrangler, "deploy", "--dry-run", "--env", "", "--config", config, "--outdir", dist],
+      {
+        cwd: dirname(config),
+        stdio: ["ignore", "inherit", "inherit"],
+        env: { ...process.env, XDG_CONFIG_HOME: configHome, WRANGLER_SEND_METRICS: "false" },
+      },
+    );
+  } finally {
+    rmSync(configHome, { recursive: true, force: true });
+  }
   rmSync(resolve(dist, "README.md"), { force: true });
   const mapFile = resolve(dist, "index.js.map");
   const map = JSON.parse(readFileSync(mapFile, "utf8"));

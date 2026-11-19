@@ -21,6 +21,7 @@
     "bench:scene": "node scripts/bench-scene-record.mjs",
     "build": "bazel run //packages/engine:dev_build",
     "build:dist": "bazel build //packages/engine:dist",
+    "build:local": "bazel run --config=devtools //packages/engine:local_build --",
     "build:wasm:memprof": "bazel run //packages/engine:dev_build && bazel run //packages/core/pkg:stage_memprof && KITESURF_MEMPROF=1 pnpm --dir packages/page-script run build",
     "deploy": "bazel run --config=devtools //packages/engine:deploy --",
     "deploy:preview": "bazel run --config=devtools //packages/engine:deploy -- --preview",

@@ -229,6 +229,24 @@ js_library(
 )
 
 js_library(
+    name = "local_build",
+    srcs = ["local-build.mjs"],
+    data = ["kitesurf.service", "local-serve.mjs"],
+    visibility = ["//packages/engine:__pkg__"],
+)
+
+node_test(
+    name = "local_release_test",
+    args = ["local-build.test.mjs"],
+    data = [
+        ":local_build",
+        "local-build.test.mjs",
+        "//packages/engine:package_json",
+        "//packages/engine:node_modules/miniflare",
+    ],
+)
+
+js_library(
     name = "stage_dev_build",
     srcs = ["stage-dev-build.mjs"],
     visibility = ["//packages/core/pkg:__pkg__", "//packages/engine:__pkg__"],
@@ -420,6 +438,7 @@ node_test(
     args = glob(
         ["*.test.mjs"],
         exclude = [
+            "local-build.test.mjs",
             "page-script-font-loader.test.mjs",
             "page-script-pdf-stream.test.mjs",
             "page-renderer-pdf-stream.test.mjs",

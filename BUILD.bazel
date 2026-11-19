@@ -12,6 +12,12 @@ exports_files([
 ])
 
 copy_to_bin(
+    name = "distribution_licenses",
+    srcs = ["LICENSE", "NOTICE"] + glob(["licenses/**"]),
+    visibility = ["//packages/engine:__pkg__"],
+)
+
+copy_to_bin(
     name = "wpt_expectations",
     srcs = ["tests/wpt-expectations.json"],
     visibility = ["//visibility:public"],
@@ -192,6 +198,7 @@ test_suite(
         "//scripts:helpers_test",
         "//scripts:lint_test",
         "//scripts:lint_types",
+        "//scripts:local_release_test",
         "//scripts:page_renderer_pdf_stream_test",
         "//scripts:page_script_font_loader_test",
         "//scripts:page_script_frame_bitmap_gate_test",

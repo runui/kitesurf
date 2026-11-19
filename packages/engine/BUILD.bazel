@@ -214,6 +214,19 @@ js_binary(
     entry_point = "//scripts:engine_deploy",
 )
 
+# Stage a standalone local release with the pinned native runtime. Starting it needs only Node.
+js_binary(
+    name = "local_build",
+    data = [
+        ":assets",
+        ":dist",
+        ":node_modules/miniflare",
+        "//:distribution_licenses",
+        "//scripts:local_build",
+    ],
+    entry_point = "//scripts:local_build",
+)
+
 # `bazel run //packages/engine:e2e -- <file-substring>` runs the matching e2e files against the
 # Bazel-built engine; with no filter it runs the whole suite (scripts/e2e-run.mjs).
 js_binary(

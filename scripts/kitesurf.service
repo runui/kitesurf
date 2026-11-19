@@ -1,0 +1,25 @@
+[Unit]
+Description=Kitesurf local browser engine
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/opt/kitesurf
+ExecStart=/usr/bin/node /opt/kitesurf/start.mjs
+Environment=NODE_ENV=production
+Environment=KITESURF_HOST=127.0.0.1
+Environment=KITESURF_PORT=8787
+EnvironmentFile=-/etc/kitesurf.env
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

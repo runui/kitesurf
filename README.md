@@ -96,6 +96,56 @@ MINIFLARE_WORKERD_V8_FLAGS=--expose-gc wrangler dev --env local
 If you set `MINIFLARE_WORKERD_V8_FLAGS` for `pnpm run dev`, your value replaces
 the default. Include `--expose-gc` in it.
 
+## Build a standalone local service
+
+Build a release directory for the current OS and CPU architecture:
+
+```bash
+pnpm run build:local --out dist/local
+```
+
+The destination must be empty or absent. This Bazel target uses the optimized
+WASM and bundled engine used for Cloudflare deployment. It includes static
+assets, the same-origin DevTools frontend, and the lockfile-resolved Miniflare
+and native workerd dependencies. The first build also downloads the frontend.
+It does not upload anything to Cloudflare or require a Cloudflare account.
+
+Start the release with Node.js 22 or newer:
+
+```bash
+NODE_ENV=production node dist/local/start.mjs
+```
+
+The release can be moved to another directory or machine with the same OS,
+architecture, and compatible native libraries. It needs no source checkout,
+Bazel, pnpm, dependency installation, or Wrangler at runtime. The service runs
+prebuilt modules through Miniflare/workerd with `KITESURF_ENV=production`,
+without file watching, the dev inspector, local tracing, or the fixtures Worker.
+This remains the experimental Kitesurf engine and local workerd runtime, with
+the security and browser compatibility limits described above.
+
+The HTTP and CDP endpoints are the same as the development server. Configure
+the listen address with `KITESURF_HOST` (default `127.0.0.1`) and `KITESURF_PORT`
+(default `8787`). Existing engine variables in `wrangler.jsonc` can be
+overridden by environment variables. The runtime enables `--expose-gc` by
+default; include that flag if overriding `MINIFLARE_WORKERD_V8_FLAGS`.
+
+For a Linux systemd service, copy the release to `/opt/kitesurf`, ensure Node
+is available at `/usr/bin/node` (or edit `ExecStart`), then install its unit:
+
+```bash
+sudo install -m 644 /opt/kitesurf/kitesurf.service /etc/systemd/system/kitesurf.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now kitesurf
+curl http://127.0.0.1:8787/health
+```
+
+The unit runs as a dynamic unprivileged user and restarts on failure. Optional
+settings go in `/etc/kitesurf.env`, one `KEY=value` per line. To update, build
+into a new empty directory, stop the service, replace `/opt/kitesurf`, and
+start it again. Keep the prior directory to roll back. Put authentication and
+TLS on a WebSocket-capable reverse proxy before exposing the service remotely.
+
 ## Connect with Puppeteer
 
 Install `puppeteer-core` in the project that will control Kitesurf. Then connect

@@ -1,6 +1,7 @@
 """Build wasm32 std with the same pinned nightly and flags as the core crate."""
 
 load("@wasm32_unwind_std//:flags.bzl", "BUILD_STD", "RUSTFLAGS")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 
 STD_CRATES = [
     "addr2line",
@@ -38,6 +39,8 @@ CARGO="$PWD/$4"
 CRATES="$5"
 PROFILE="$6"
 RUSTFLAGS_TOML="$7"
+HOST_CC="$8"
+[[ "$HOST_CC" = /* ]] || HOST_CC="$ROOT/$HOST_CC"
 B=/tmp/kitesurf-wasm-std
 exec 9>"$B.lock"
 if command -v flock >/dev/null 2>&1; then
@@ -53,6 +56,7 @@ tar -xf "$SRC" -C "$B"
 : > "$B/src/lib.rs"
 printf '%s\\n' "$PROFILE" > "$B/Cargo.toml"
 COMMIT="$("$RUSTC" -vV | sed -n 's/^commit-hash: //p')"
+HOST="$("$RUSTC" -vV | sed -n 's/^host: //p')"
 cat > "$B/.cargo-home/config.toml" <<EOF
 [source.crates-io]
 replace-with = "vendored"
@@ -60,13 +64,15 @@ replace-with = "vendored"
 directory = "$B/vendor"
 [target.wasm32-unknown-unknown]
 rustflags = $RUSTFLAGS_TOML
+[target.$HOST]
+linker = "$HOST_CC"
 EOF
 WRAPPER='#!/bin/sh\\nexec "$@" --remap-path-prefix=%s=/rustc/%s '
 WRAPPER="${WRAPPER}--remap-path-prefix=%s/vendor=/rust/deps\\n"
 printf "$WRAPPER" "$B" "$COMMIT" "$B" > "$B/wrap.sh"
 chmod +x "$B/wrap.sh"
 cd "$B"
-env -i PATH=/usr/bin:/bin HOME="$B" CARGO_HOME="$B/.cargo-home" CARGO_TARGET_DIR="$B/target" \\
+env -i PATH="$(dirname "$HOST_CC"):/usr/bin:/bin" HOME="$B" CARGO_HOME="$B/.cargo-home" CARGO_TARGET_DIR="$B/target" \\
   RUSTC="$RUSTC" RUSTC_WRAPPER="$B/wrap.sh" __CARGO_TESTS_ONLY_SRC_ROOT="$B/library" \\
   "$CARGO" build --release --offline --target wasm32-unknown-unknown -Zbuild-std="$BUILD_STD" \\
   > "$B/cargo.log" 2>&1 || { cat "$B/cargo.log"; exit 1; }
@@ -109,15 +115,19 @@ def _wasm_std_impl(ctx):
     ]
     rustc = ctx.file._rustc
     cargo = ctx.file._cargo
+    # Cargo's host build scripts need the execution platform's native linker, even for wasm.
+    cc_toolchain = ctx.attr._cc_toolchain[cc_common.CcToolchainInfo]
     args = ctx.actions.args()
     args.add_all([ctx.file.src.path, outputs[0].dirname, rustc.path, cargo.path])
     args.add(" ".join(sorted(STD_CRATES)))
     args.add(_PROFILE)
     args.add("[%s]" % ", ".join([json.encode(flag) for flag in RUSTFLAGS]))
+    args.add(cc_toolchain.compiler_executable)
     ctx.actions.run_shell(
         command = _SCRIPT.replace("$BUILD_STD", ",".join(BUILD_STD)),
         arguments = [args],
         inputs = depset([ctx.file.src, rustc, cargo], transitive = [
+            cc_toolchain.all_files,
             ctx.attr._rustc_lib.files,
             ctx.attr._host_std.files,
             ctx.attr._linker.files,
@@ -134,6 +144,10 @@ wasm_std = rule(
     implementation = _wasm_std_impl,
     attrs = {
         "src": attr.label(mandatory = True, allow_single_file = [".tar"]),
+        "_cc_toolchain": attr.label(
+            default = "@rules_cc//cc:current_cc_toolchain",
+            cfg = "exec",
+        ),
         "_cargo": attr.label(
             default = "//bazel/rust:exec_cargo",
             cfg = "exec",
